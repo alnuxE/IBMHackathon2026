@@ -50,6 +50,8 @@ function RechargeForm() {
         user_id: getCurrentUserId(),
         amount: amt,
         payment_method: method,
+        // Idempotencia: un reintento con la misma clave no recarga dos veces.
+        idempotency_key: crypto.randomUUID(),
       });
       toast(`Recarga exitosa. Nuevo saldo: ${money(res.new_balance)}`, 'success');
       router.push('/wallet');

@@ -21,6 +21,12 @@ async function getAccount(req, res, next) {
     const id = parseId(req.params.userId);
     if (id === null) return res.status(400).json({ error: 'invalid_id' });
 
+    // Un usuario solo puede consultar su propia cuenta.
+    // Las llamadas internas (processor-service) pueden consultar cualquiera.
+    if (!req.internal && req.userId !== id) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+
     const user = await service.getById(id);
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
@@ -39,19 +45,24 @@ async function listAccounts(req, res, next) {
   }
 }
 
-// RF-002 · POST /api/recharge   body: { user_id, amount, payment_method }
+// RF-002 · POST /api/recharge   body: { amount, payment_method, idempotency_key? }
+// El usuario solo puede recargar SU PROPIA cuenta: el id se toma del token,
+// nunca del body. La recarga es un crédito IDEMPOTENTE y queda registrada en el
+// ledger (auditoría): un reintento con la misma idempotency_key no recarga dos veces.
 async function recharge(req, res, next) {
   try {
-    const id = parseId(req.body.user_id);
-    if (id === null) return res.status(400).json({ error: 'invalid_id' });
+    const id = req.userId;
 
     const amount = parseAmount(req.body.amount);
     if (amount === null) return res.status(400).json({ error: 'invalid_amount' });
 
-    const newBalance = await service.recharge(id, amount);
-    if (newBalance === null) return res.status(404).json({ error: 'user_not_found' });
+    const key = req.body.idempotency_key;
+    const opKey = typeof key === 'string' && key.length > 0 ? `recharge:${key}`.slice(0, 80) : null;
 
-    res.json({ user_id: id, new_balance: newBalance });
+    const result = await service.updateBalance(id, amount, 'credit', opKey);
+    if (result.notFound) return res.status(404).json({ error: 'user_not_found' });
+
+    res.json({ user_id: id, new_balance: result.new_balance });
   } catch (err) {
     next(err);
   }
@@ -72,7 +83,12 @@ async function updateBalance(req, res, next) {
       return res.status(400).json({ error: 'invalid_operation' });
     }
 
-    const result = await service.updateBalance(id, amount, operation);
+    // Clave de idempotencia de la operación (la envía el processor por leg).
+    const opKey = typeof req.body.op_key === 'string' && req.body.op_key.length > 0
+      ? req.body.op_key.slice(0, 80)
+      : null;
+
+    const result = await service.updateBalance(id, amount, operation, opKey);
     if (result.notFound) return res.status(404).json({ error: 'user_not_found' });
     if (result.insufficientFunds) return res.status(400).json({ error: 'insufficient_funds' });
 

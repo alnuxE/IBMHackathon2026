@@ -66,6 +66,11 @@ services:
       DB_NAME: accounts_db
       DB_USER: ${DB_USER:-neowallet}
       DB_PASSWORD: ${DB_PASSWORD:-neowallet}
+      # Autenticación: secreto JWT (compartido con processor) + clave interna + seed
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      SEED_PASSWORD: ${SEED_PASSWORD:-neowallet123}
     depends_on:
       accounts-db:
         condition: service_healthy
@@ -87,6 +92,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-neowallet}
       # Comunicación entre servicios por HTTP usando el nombre de red interno
       ACCOUNTS_SERVICE_URL: http://accounts-service:3000
+      # Mismo secreto JWT que accounts (para verificar tokens) + clave interna
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
     depends_on:
       processor-db:
         condition: service_healthy

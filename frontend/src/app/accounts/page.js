@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import WalletGuard from '../../components/WalletGuard';
 import { accountsApi } from '../../services/api';
 import { getCurrentUserId } from '../../utils/wallet';
-import { money, initials } from '../../utils/format';
+import { initials } from '../../utils/format';
 
 function Accounts() {
   const [users, setUsers] = useState([]);
@@ -19,8 +19,6 @@ function Accounts() {
       .finally(() => setLoading(false));
   }, []);
 
-  const total = users.reduce((acc, u) => acc + Number(u.balance), 0);
-
   if (loading) return <div className="loading"><span className="spinner" /> Cargando usuarios…</div>;
 
   return (
@@ -29,7 +27,8 @@ function Accounts() {
         <span className="eyebrow">Cuentas</span>
         <h1>Usuarios de NeoWallet</h1>
         <p className="lead muted">
-          Total de dinero en el sistema: <b>{money(total)}</b> (debe mantenerse constante salvo recargas).
+          Directorio de usuarios de la plataforma. Por seguridad, el saldo de cada
+          cuenta solo es visible para su propietario.
         </p>
       </div>
 
@@ -47,10 +46,6 @@ function Accounts() {
               {u.id === currentId && (
                 <span className="status status--completed"><span className="dot" />Tú</span>
               )}
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <div className="muted" style={{ fontSize: 12 }}>Saldo</div>
-              <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{money(u.balance)}</div>
             </div>
           </div>
         ))}

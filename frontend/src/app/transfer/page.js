@@ -55,6 +55,9 @@ function TransferForm() {
         sender_id: getCurrentUserId(),
         receiver_id: Number(receiverId),
         amount: amt,
+        // Idempotencia: si la petición se reintenta (red/timeout), el backend no
+        // crea una segunda transferencia con la misma clave.
+        idempotency_key: crypto.randomUUID(),
       });
       toast(`Transferencia completada (#${res.transaction_id})`, 'success');
       router.push('/wallet');

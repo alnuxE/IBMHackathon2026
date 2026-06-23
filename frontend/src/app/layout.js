@@ -2,6 +2,7 @@ import './globals.css';
 import { Manrope } from 'next/font/google';
 import Nav from '../components/Nav';
 import { ToastProvider } from '../components/Toast';
+import RealtimeBridge from '../components/RealtimeBridge';
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -21,6 +22,7 @@ export default function RootLayout({ children }) {
       <body>
         <ToastProvider>
           <Nav />
+          <RealtimeBridge />
           <main className="container">{children}</main>
         </ToastProvider>
       </body>

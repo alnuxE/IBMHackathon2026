@@ -1,11 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 const accountsRoutes = require('./routes/accounts.routes');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Documentación interactiva de la API (OpenAPI 3.0)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check (RNF-002 / bonus observabilidad)
 app.get('/health', (req, res) => {

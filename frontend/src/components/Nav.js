@@ -3,20 +3,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { accountsApi } from '../services/api';
-import { getCurrentUserId, setCurrentUserId } from '../utils/wallet';
+import { getCurrentUser, clearSession } from '../utils/wallet';
 
 export default function Nav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [users, setUsers] = useState([]);
-  const [currentId, setCurrentId] = useState(null);
+  const [user, setUser] = useState(null);
 
-  const sync = useCallback(() => setCurrentId(getCurrentUserId()), []);
-
-  useEffect(() => {
-    accountsApi.list().then(setUsers).catch(() => setUsers([]));
-  }, [pathname]);
+  const sync = useCallback(() => setUser(getCurrentUser()), []);
 
   useEffect(() => {
     sync();
@@ -24,16 +18,14 @@ export default function Nav() {
     return () => window.removeEventListener('neowallet:user-changed', sync);
   }, [sync, pathname]);
 
-  // En la pantalla de selección de usuario no mostramos navegación
+  // En la pantalla de login no mostramos navegación
   if (pathname === '/') return null;
 
   const isActive = (href) => pathname === href || pathname.startsWith(href + '/');
 
-  function onSwitch(e) {
-    const id = Number(e.target.value);
-    setCurrentUserId(id);
-    setCurrentId(id);
-    router.refresh();
+  function onLogout() {
+    clearSession();
+    router.push('/');
   }
 
   return (
@@ -51,12 +43,13 @@ export default function Nav() {
 
       <span className="nav-spacer" />
 
-      {users.length > 0 && currentId != null && (
-        <select className="nav-select" value={currentId} onChange={onSwitch} aria-label="Cambiar de usuario">
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.name}</option>
-          ))}
-        </select>
+      {user && (
+        <>
+          <span className="nav-user muted" style={{ fontSize: 13 }}>{user.name}</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onLogout}>
+            Cerrar sesión
+          </button>
+        </>
       )}
     </nav>
   );
