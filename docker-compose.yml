@@ -1,0 +1,103 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NeoWallet — Orquestación local (escenario 2)
+# Arquitectura: 2 microservicios + 1 base de datos por servicio (database-per-service).
+#
+#   accounts-service  :3000  ──► accounts_db   (Postgres :5432)
+#   processor-service :3001  ──► processor_db  (Postgres :5433)
+#   processor-service ──HTTP──► accounts-service  (red interna)
+#
+# Uso:  docker compose up --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Base de datos del servicio de cuentas ──────────────────────────────────
+  accounts-db:
+    image: postgres:16-alpine
+    container_name: neowallet-accounts-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: accounts_db
+      POSTGRES_USER: ${DB_USER:-neowallet}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-neowallet}
+    ports:
+      - "5432:5432"
+    volumes:
+      - accounts-db-data:/var/lib/postgresql/data
+      - ./shared-infra/accounts-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-neowallet} -d accounts_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [neowallet-net]
+
+  # ── Base de datos del servicio de procesamiento ────────────────────────────
+  processor-db:
+    image: postgres:16-alpine
+    container_name: neowallet-processor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: processor_db
+      POSTGRES_USER: ${DB_USER:-neowallet}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-neowallet}
+    ports:
+      - "5433:5432"
+    volumes:
+      - processor-db-data:/var/lib/postgresql/data
+      - ./shared-infra/processor-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-neowallet} -d processor_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [neowallet-net]
+
+  # ── Microservicio de cuentas (saldos) ──────────────────────────────────────
+  accounts-service:
+    build: ./accounts-service
+    container_name: neowallet-accounts
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: accounts-db
+      DB_PORT: 5432
+      DB_NAME: accounts_db
+      DB_USER: ${DB_USER:-neowallet}
+      DB_PASSWORD: ${DB_PASSWORD:-neowallet}
+    depends_on:
+      accounts-db:
+        condition: service_healthy
+    networks: [neowallet-net]
+
+  # ── Microservicio de procesamiento (transferencias) ────────────────────────
+  processor-service:
+    build: ./processor-service
+    container_name: neowallet-processor
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DB_HOST: processor-db
+      DB_PORT: 5432
+      DB_NAME: processor_db
+      DB_USER: ${DB_USER:-neowallet}
+      DB_PASSWORD: ${DB_PASSWORD:-neowallet}
+      # Comunicación entre servicios por HTTP usando el nombre de red interno
+      ACCOUNTS_SERVICE_URL: http://accounts-service:3000
+    depends_on:
+      processor-db:
+        condition: service_healthy
+      accounts-service:
+        condition: service_started
+    networks: [neowallet-net]
+
+volumes:
+  accounts-db-data:
+  processor-db-data:
+
+networks:
+  neowallet-net:
+    driver: bridge

@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NeoWallet — Modo DESARROLLO (hot reload sin reconstruir)
+#
+# Monta el código como volumen y corre los servicios con `node --watch`.
+# Al guardar un archivo, el servicio se recarga solo (sin --build).
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Atajo (una vez por terminal):
+#   export COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+#   docker compose up
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  accounts-service:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./accounts-service:/app
+      - /app/node_modules
+
+  processor-service:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./processor-service:/app
+      - /app/node_modules
