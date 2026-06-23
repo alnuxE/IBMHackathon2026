@@ -1,48 +1,22 @@
-// Lógica de negocio del processor-service: orquesta la transferencia P2P.
+// Lógica del processor-service: orquesta la transferencia P2P (patrón Saga).
 //
-// IMPORTANTE (RNF-006): el processor NO toca la tabla `users` directamente.
-// Modifica saldos llamando al accounts-service vía HTTP (accountsClient).
-// El estado de cada transferencia se persiste en la tabla `transactions`.
-//
-// 👉 Implementa la transferencia siguiendo el patrón Saga (sección 6 / RF-003 / CU-005).
+// El processor NO toca la tabla `users`: modifica saldos llamando al
+// accounts-service vía HTTP. El estado de cada transferencia se persiste en
+// la tabla `transactions`. CRÍTICO: no se pierde dinero bajo ninguna
+// circunstancia (RNF-006 / CU-005).
 
-const { query, pool } = require('../config/db');
+const { query } = require('../config/db');
 const accountsClient = require('../clients/accounts.client');
-const TxModel = require('../models/transaction.model');
+const { STATUS } = require('../models/transaction.model');
 
-// RF-003 · Transferencia P2P con compensación (Saga)
-async function transfer(senderId, receiverId, amount) {
-  // TODO — flujo recomendado (ver RF-003, pasos 6-10, y CU-005):
-  //
-  //  1. Crear transacción en estado PENDING:
-  //     const { rows } = await query(
-  //       `INSERT INTO transactions (sender_id, receiver_id, amount, status)
-  //        VALUES ($1, $2, $3, 'PENDING') RETURNING id`, [senderId, receiverId, amount]);
-  //     const txId = rows[0].id;
-  //
-  //  2. DEBITAR al sender (accounts-service):
-  //     await accountsClient.updateBalance(senderId, amount, 'debit');
-  //     - si responde insufficient_funds  → marcar tx FAILED y devolver { error: 'insufficient_funds' }
-  //     - si el sender no existe           → marcar tx FAILED y devolver { error: 'user_not_found' }
-  //     - si ok                           → marcar tx DEBITED
-  //
-  //  3. ACREDITAR al receiver (accounts-service):
-  //     try {
-  //       await accountsClient.updateBalance(receiverId, amount, 'credit');
-  //     } catch (e) {
-  //       // COMPENSACIÓN: devolver el dinero al sender y marcar ROLLED_BACK
-  //       await accountsClient.updateBalance(senderId, amount, 'credit');
-  //       await setStatus(txId, 'ROLLED_BACK', e.message);
-  //       return { error: 'rolled_back' };
-  //     }
-  //
-  //  4. Marcar tx COMPLETED y devolver { transaction_id: txId }
-  //
-  //  CRÍTICO: bajo ninguna circunstancia se debe perder dinero (RNF-006).
-  throw new Error('not_implemented: processor.service.transfer');
+// Extrae el código de error que devolvió el accounts-service (si lo hay)
+function remoteError(err) {
+  return {
+    status: err.response?.status,
+    code: err.response?.data?.error,
+  };
 }
 
-// Helper sugerido para cambiar el estado de una transacción
 async function setStatus(txId, status, errorMessage = null) {
   await query(
     'UPDATE transactions SET status = $1, error_message = $2 WHERE id = $3',
@@ -50,15 +24,90 @@ async function setStatus(txId, status, errorMessage = null) {
   );
 }
 
-// RF-005 (BONUS) · Historial de un usuario
+// RF-003 · Transferencia P2P con compensación (Saga).
+// Devuelve { transaction_id, status } en éxito, o { error, transaction_id } en fallo.
+async function transfer(senderId, receiverId, amount) {
+  // 1. Registrar la transacción en estado PENDING
+  const { rows } = await query(
+    `INSERT INTO transactions (sender_id, receiver_id, amount, status)
+     VALUES ($1, $2, $3, $4) RETURNING id`,
+    [senderId, receiverId, amount, STATUS.PENDING]
+  );
+  const txId = rows[0].id;
+
+  // 2. Verificar que el receiver exista ANTES de mover dinero (evita débito inútil)
+  try {
+    await accountsClient.getAccount(receiverId);
+  } catch (err) {
+    const { status } = remoteError(err);
+    if (status === 404) {
+      await setStatus(txId, STATUS.FAILED, 'receiver_not_found');
+      return { error: 'user_not_found', transaction_id: txId };
+    }
+    await setStatus(txId, STATUS.FAILED, `accounts_unreachable: ${err.message}`);
+    return { error: 'service_unavailable', transaction_id: txId };
+  }
+
+  // 3. DEBITAR al sender
+  try {
+    await accountsClient.updateBalance(senderId, amount, 'debit');
+  } catch (err) {
+    const { status, code } = remoteError(err);
+    if (status === 400 && code === 'insufficient_funds') {
+      await setStatus(txId, STATUS.FAILED, 'insufficient_funds');
+      return { error: 'insufficient_funds', transaction_id: txId };
+    }
+    if (status === 404) {
+      await setStatus(txId, STATUS.FAILED, 'sender_not_found');
+      return { error: 'user_not_found', transaction_id: txId };
+    }
+    await setStatus(txId, STATUS.FAILED, `debit_failed: ${err.message}`);
+    return { error: 'service_unavailable', transaction_id: txId };
+  }
+  await setStatus(txId, STATUS.DEBITED);
+
+  // 4. ACREDITAR al receiver
+  try {
+    await accountsClient.updateBalance(receiverId, amount, 'credit');
+  } catch (err) {
+    // COMPENSACIÓN (Saga): devolver el dinero al sender
+    try {
+      await accountsClient.updateBalance(senderId, amount, 'credit');
+      await setStatus(txId, STATUS.ROLLED_BACK, `credit_failed: ${err.message}`);
+      return { error: 'rolled_back', transaction_id: txId };
+    } catch (compErr) {
+      // Caso extremo: la compensación también falló. Se deja registrado para
+      // reconciliación manual; el dinero NO se duplica (solo está debitado).
+      await setStatus(txId, STATUS.FAILED, `rollback_failed: ${compErr.message}`);
+      return { error: 'rollback_failed', transaction_id: txId };
+    }
+  }
+
+  // 5. Completar
+  await setStatus(txId, STATUS.COMPLETED);
+  return { transaction_id: txId, status: STATUS.COMPLETED };
+}
+
+// RF-005 (BONUS) · Historial de un usuario (enviadas + recibidas)
 async function getHistory(userId) {
-  // TODO:
-  // const { rows } = await query(
-  //   `SELECT * FROM transactions
-  //    WHERE sender_id = $1 OR receiver_id = $1
-  //    ORDER BY created_at DESC`, [userId]);
-  // return rows.map(t => ({ ...t, type: t.sender_id === Number(userId) ? 'sent' : 'received' }));
-  throw new Error('not_implemented: processor.service.getHistory');
+  const { rows } = await query(
+    `SELECT id, sender_id, receiver_id, amount, status, created_at
+     FROM transactions
+     WHERE sender_id = $1 OR receiver_id = $1
+     ORDER BY created_at DESC, id DESC`,
+    [userId]
+  );
+  return rows.map((t) => ({
+    id: t.id,
+    sender_id: t.sender_id,
+    receiver_id: t.receiver_id,
+    amount: Number(t.amount),
+    status: t.status,
+    created_at: t.created_at,
+    // Punto de vista del usuario consultado
+    type: t.sender_id === Number(userId) ? 'sent' : 'received',
+    counterparty_id: t.sender_id === Number(userId) ? t.receiver_id : t.sender_id,
+  }));
 }
 
 module.exports = { transfer, getHistory, setStatus };

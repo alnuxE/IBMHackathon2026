@@ -94,6 +94,23 @@ services:
         condition: service_started
     networks: [neowallet-net]
 
+  # ── Frontend (Next.js) ─────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # URLs que usa el NAVEGADOR (puertos publicados en localhost)
+        NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+        NEXT_PUBLIC_PROCESSOR_URL: http://localhost:3001
+    container_name: neowallet-frontend
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    depends_on:
+      - accounts-service
+      - processor-service
+    networks: [neowallet-net]
+
 volumes:
   accounts-db-data:
   processor-db-data:

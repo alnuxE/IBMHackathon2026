@@ -1,22 +1,57 @@
-// Controladores del processor-service.
-// 👉 Todo lo marcado con TODO es lo que tienes que implementar.
-
+// Controladores del processor-service: validación + mapeo a códigos HTTP.
 const service = require('../services/processor.service');
+
+function parseId(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function parseAmount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (Math.round(n * 100) !== n * 100) return null; // más de 2 decimales
+  return Math.round(n * 100) / 100;
+}
+
+// Mapea el error de negocio del service a un código HTTP
+function statusForError(error) {
+  switch (error) {
+    case 'self_transfer_not_allowed':
+    case 'invalid_amount':
+    case 'invalid_id':
+    case 'insufficient_funds':
+      return 400;
+    case 'user_not_found':
+      return 404;
+    case 'rolled_back':
+      return 409; // se revirtió: no se perdió dinero, pero la transferencia no se completó
+    default:
+      return 502; // service_unavailable / rollback_failed
+  }
+}
 
 // RF-003 · POST /api/transfer   body: { sender_id, receiver_id, amount }
 async function transfer(req, res, next) {
   try {
-    // TODO (RF-003) — validaciones de entrada:
-    //  - sender_id != receiver_id        → 400 { error: 'self_transfer_not_allowed' }
-    //  - amount > 0 y numérico            → 400 { error: 'invalid_amount' }
-    //  Luego delega al service, que orquesta la transferencia (patrón Saga):
-    //  const result = await service.transfer(sender_id, receiver_id, amount);
-    //  Mapear result a HTTP:
-    //   - ok                       → 201 { transaction_id, status: 'COMPLETED' }
-    //   - 'user_not_found'         → 404
-    //   - 'insufficient_funds'     → 400
-    //   - 'rolled_back' / 'failed' → 409 / 500 según el caso
-    res.status(501).json({ error: 'not_implemented', endpoint: 'transfer (RF-003)' });
+    const senderId = parseId(req.body.sender_id);
+    const receiverId = parseId(req.body.receiver_id);
+    if (senderId === null || receiverId === null) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+    if (senderId === receiverId) {
+      return res.status(400).json({ error: 'self_transfer_not_allowed' });
+    }
+    const amount = parseAmount(req.body.amount);
+    if (amount === null) {
+      return res.status(400).json({ error: 'invalid_amount' });
+    }
+
+    const result = await service.transfer(senderId, receiverId, amount);
+
+    if (result.error) {
+      return res.status(statusForError(result.error)).json(result);
+    }
+    res.status(201).json(result);
   } catch (err) {
     next(err);
   }
@@ -25,11 +60,10 @@ async function transfer(req, res, next) {
 // RF-005 (BONUS) · GET /api/transactions/:userId
 async function getTransactions(req, res, next) {
   try {
-    // TODO (RF-005):
-    //  1. Validar userId numérico
-    //  2. const list = await service.getHistory(userId)
-    //  3. 200 con la lista ordenada por fecha desc, con el tipo (sent/received)
-    res.status(501).json({ error: 'not_implemented', endpoint: 'getTransactions (RF-005)' });
+    const id = parseId(req.params.userId);
+    if (id === null) return res.status(400).json({ error: 'invalid_id' });
+
+    res.json(await service.getHistory(id));
   } catch (err) {
     next(err);
   }

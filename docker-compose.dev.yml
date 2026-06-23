@@ -28,3 +28,14 @@ services:
     volumes:
       - ./processor-service:/app
       - /app/node_modules
+
+  frontend:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      NEXT_PUBLIC_PROCESSOR_URL: http://localhost:3001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
