@@ -39,6 +39,7 @@ export default function Nav() {
       <Link href="/transfer" className={`nav-link ${isActive('/transfer') ? 'is-active' : ''}`}>Transferir</Link>
       <Link href="/recharge" className={`nav-link ${isActive('/recharge') ? 'is-active' : ''}`}>Recargar</Link>
       <Link href="/history" className={`nav-link ${isActive('/history') ? 'is-active' : ''}`}>Historial</Link>
+      <Link href="/statements" className={`nav-link ${isActive('/statements') ? 'is-active' : ''}`}>Estados</Link>
       <Link href="/accounts" className={`nav-link ${isActive('/accounts') ? 'is-active' : ''}`}>Usuarios</Link>
 
       <span className="nav-spacer" />

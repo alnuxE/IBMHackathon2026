@@ -74,6 +74,8 @@ curl -X POST http://localhost:3000/api/recharge \
 |--------|------|------|-------------|
 | POST | `/api/transfer` | Bearer | Transferencia P2P (Saga). El emisor es el usuario del token |
 | GET | `/api/transactions/{userId}` | Bearer | Historial propio (enviadas + recibidas) |
+| GET | `/api/statements/{userId}` | Bearer | Estado de cuenta propio (JSON): resumen + movimientos |
+| GET | `/api/statements/{userId}/pdf` | Bearer | Estado de cuenta propio en **PDF** (descarga) |
 | GET | `/health` | — | Estado del servicio |
 
 ### Reglas de negocio (processor)

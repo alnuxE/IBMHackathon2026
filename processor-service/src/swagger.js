@@ -9,6 +9,7 @@ module.exports = {
   servers: [{ url: '/', description: 'Este servicio' }],
   tags: [
     { name: 'Transferencias', description: 'Pagos P2P' },
+    { name: 'Estados de cuenta', description: 'Estado de cuenta / facturación' },
     { name: 'Sistema' },
   ],
   components: {
@@ -77,6 +78,32 @@ module.exports = {
           200: { description: 'Lista', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Transaction' } } } } },
           401: { $ref: '#/components/responses/NoAutenticado' },
           403: { description: 'Historial ajeno' },
+        },
+      },
+    },
+    '/api/statements/{userId}': {
+      get: {
+        tags: ['Estados de cuenta'],
+        summary: 'Estado de cuenta propio (JSON): resumen + movimientos liquidados',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'userId', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: {
+          200: { description: 'Estado de cuenta' },
+          401: { $ref: '#/components/responses/NoAutenticado' },
+          403: { description: 'Cuenta ajena' },
+        },
+      },
+    },
+    '/api/statements/{userId}/pdf': {
+      get: {
+        tags: ['Estados de cuenta'],
+        summary: 'Estado de cuenta propio en PDF (descarga)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'userId', in: 'path', required: true, schema: { type: 'integer' } }],
+        responses: {
+          200: { description: 'Documento PDF', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } },
+          401: { $ref: '#/components/responses/NoAutenticado' },
+          403: { description: 'Cuenta ajena' },
         },
       },
     },

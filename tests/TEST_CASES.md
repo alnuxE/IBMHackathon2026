@@ -142,6 +142,30 @@ ejecutable con Newman) y en las features BDD ([`features/`](./features/)).
 
 ---
 
+## 5b. Estados de cuenta / facturación
+
+### CP-30 · Estado de cuenta propio (JSON)
+- **Pasos:** GET `/api/statements/{idPropio}` con token propio.
+- **Esperado:** `200` + `{ user, current_balance, summary{total_sent,total_received,count}, movements[] }`.
+
+### CP-31 · Estado de cuenta ajeno
+- **Pasos:** GET `/api/statements/{idAjeno}` con token propio.
+- **Esperado:** `403 forbidden`.
+
+### CP-32 · Estado de cuenta sin token
+- **Pasos:** GET `/api/statements/{id}` sin token.
+- **Esperado:** `401 unauthorized`.
+
+### CP-33 · Estado de cuenta en PDF (propio)
+- **Pasos:** GET `/api/statements/{idPropio}/pdf` con token propio.
+- **Esperado:** `200`, `Content-Type: application/pdf`, el cuerpo comienza con `%PDF`.
+
+### CP-34 · Estado de cuenta en PDF (ajeno)
+- **Pasos:** GET `/api/statements/{idAjeno}/pdf` con token propio.
+- **Esperado:** `403 forbidden`.
+
+---
+
 ## 6. Tiempo real (WebSocket)
 
 ### CP-26 · Handshake sin token
@@ -175,5 +199,6 @@ ejecutable con Newman) y en las features BDD ([`features/`](./features/)).
 | Transferencias | CP-11..20 | RF-003, RN-002/003/004, CU-001..005, RNF-006 |
 | Interno/compensación | CP-21..23 | RF-004, CU-005 |
 | Historial | CP-24..25 | RF-005 |
+| Estados de cuenta / facturación | CP-30..34 | (mejora) |
 | Tiempo real | CP-26..27 | (mejora) |
 | Disponibilidad/docs | CP-28..29 | RNF-002, bonus |

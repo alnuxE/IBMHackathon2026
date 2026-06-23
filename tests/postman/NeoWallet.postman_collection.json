@@ -297,6 +297,47 @@
         "pm.test('403', () => pm.response.code === 403);"
       ] } }],
       "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{processor}}/api/transactions/{{idB}}", "host": ["{{processor}}"], "path": ["api", "transactions", "{{idB}}"] } }
+    },
+    {
+      "name": "CP-30 Estado de cuenta propio JSON (200)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "const d = pm.response.json();",
+        "pm.test('tiene summary', () => d.summary && typeof d.summary.count === 'number');",
+        "pm.test('tiene movimientos', () => Array.isArray(d.movements));",
+        "pm.test('tiene titular', () => d.user && d.user.id == pm.collectionVariables.get('idA'));"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{processor}}/api/statements/{{idA}}", "host": ["{{processor}}"], "path": ["api", "statements", "{{idA}}"] } }
+    },
+    {
+      "name": "CP-31 Estado de cuenta ajeno (403)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('403', () => pm.response.code === 403);"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{processor}}/api/statements/{{idB}}", "host": ["{{processor}}"], "path": ["api", "statements", "{{idB}}"] } }
+    },
+    {
+      "name": "CP-32 Estado de cuenta sin token (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ] } }],
+      "request": { "method": "GET", "header": [], "url": { "raw": "{{processor}}/api/statements/{{idA}}", "host": ["{{processor}}"], "path": ["api", "statements", "{{idA}}"] } }
+    },
+    {
+      "name": "CP-33 Estado de cuenta PDF propio (200, %PDF)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('Content-Type PDF', () => (pm.response.headers.get('Content-Type') || '').includes('application/pdf'));",
+        "pm.test('cuerpo es un PDF', () => pm.response.text().startsWith('%PDF'));"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{processor}}/api/statements/{{idA}}/pdf", "host": ["{{processor}}"], "path": ["api", "statements", "{{idA}}", "pdf"] } }
+    },
+    {
+      "name": "CP-34 Estado de cuenta PDF ajeno (403)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('403', () => pm.response.code === 403);"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{processor}}/api/statements/{{idB}}/pdf", "host": ["{{processor}}"], "path": ["api", "statements", "{{idB}}", "pdf"] } }
     }
   ]
 }

@@ -96,4 +96,23 @@ export const accountsApi = {
 export const processorApi = {
   transfer: (body) => request(`${PROCESSOR_URL}/api/transfer`, jsonPost(body), 'procesamiento'),
   history: (userId) => request(`${PROCESSOR_URL}/api/transactions/${userId}`, {}, 'procesamiento'),
+  statement: (userId) => request(`${PROCESSOR_URL}/api/statements/${userId}`, {}, 'procesamiento'),
 };
+
+// Descarga el estado de cuenta en PDF (requiere token). Devuelve un Blob.
+// No usa request() porque la respuesta es binaria, no JSON.
+export async function downloadStatementPdf(userId) {
+  const res = await fetch(`${PROCESSOR_URL}/api/statements/${userId}/pdf`, {
+    headers: { ...authHeaders() },
+  });
+  if (res.status === 401 && typeof window !== 'undefined') {
+    clearSession();
+    if (window.location.pathname !== '/') window.location.href = '/';
+    throw new Error('Tu sesión expiró. Inicia sesión de nuevo.');
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(ERROR_MESSAGES[data.error] || data.error || `Error ${res.status}`);
+  }
+  return res.blob();
+}
