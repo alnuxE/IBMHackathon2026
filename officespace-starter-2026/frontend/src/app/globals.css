@@ -184,7 +184,7 @@ h3 { font-size: 16px; letter-spacing: -0.01em; }
 .card-link:hover .go { gap: 12px; color: var(--primary); }
 
 /* ---------- Grid ---------- */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-auto-rows: 1fr; gap: 16px; }
 
 /* ---------- Forms ---------- */
 .field { margin-bottom: 14px; }
