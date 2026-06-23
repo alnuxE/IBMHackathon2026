@@ -8,6 +8,16 @@ Requisitos completos en [`Escenario 2 Requerimientos.md`](./Escenario%202%20Requ
 
 ---
 
+## 👤 Autor
+
+- **Estrada Olalde Daniel Alejandro**
+- Ingeniería en Informática — **UPIICSA** (Instituto Politécnico Nacional)
+- GitHub: [@alnuxE](https://github.com/alnuxE)
+
+> Proyecto desarrollado por **Daniel Alejandro Estrada Olalde** para el **IBM Hackathon 2026** (Escenario 2 — NeoWallet).
+
+---
+
 ## 🏗️ Arquitectura
 
 ```
