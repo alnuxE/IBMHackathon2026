@@ -119,4 +119,24 @@ async function updateBalance(userId, amount, operation, opKey = null) {
   }
 }
 
-module.exports = { getById, getAll, updateBalance };
+// Ledger de movimientos de saldo de un usuario (para el estado de cuenta).
+// Cada fila trae el saldo antes/después → permite reconstruir el saldo corriente.
+async function getLedger(userId) {
+  const { rows } = await query(
+    `SELECT op_key, operation, amount, previous_balance, new_balance, created_at
+     FROM applied_operations
+     WHERE user_id = $1
+     ORDER BY created_at ASC, op_key ASC`,
+    [userId]
+  );
+  return rows.map((r) => ({
+    op_key: r.op_key,
+    operation: r.operation,
+    amount: Number(r.amount),
+    previous_balance: Number(r.previous_balance),
+    new_balance: Number(r.new_balance),
+    created_at: r.created_at,
+  }));
+}
+
+module.exports = { getById, getAll, updateBalance, getLedger };

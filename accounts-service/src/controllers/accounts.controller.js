@@ -102,4 +102,15 @@ async function updateBalance(req, res, next) {
   }
 }
 
-module.exports = { getAccount, listAccounts, recharge, updateBalance };
+// GET /accounts/:userId/ledger  (INTERNO) · movimientos de saldo del usuario
+async function getLedger(req, res, next) {
+  try {
+    const id = parseId(req.params.userId);
+    if (id === null) return res.status(400).json({ error: 'invalid_id' });
+    res.json(await service.getLedger(id));
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { getAccount, listAccounts, recharge, updateBalance, getLedger };

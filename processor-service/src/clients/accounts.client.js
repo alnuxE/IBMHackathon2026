@@ -32,4 +32,10 @@ async function updateBalance(userId, amount, operation, opKey) {
   return data;
 }
 
-module.exports = { getAccount, updateBalance };
+// Ledger de movimientos de saldo de un usuario (para el estado de cuenta)
+async function getLedger(userId) {
+  const { data } = await http.get(`/accounts/${userId}/ledger`);
+  return data;
+}
+
+module.exports = { getAccount, updateBalance, getLedger };

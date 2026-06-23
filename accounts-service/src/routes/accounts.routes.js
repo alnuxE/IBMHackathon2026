@@ -24,4 +24,7 @@ router.post('/api/recharge', requireUser, ctrl.recharge);
 // RF-004 · Actualizar balance (endpoint INTERNO: solo el processor-service)
 router.post('/accounts/update-balance', requireInternal, ctrl.updateBalance);
 
+// Ledger de movimientos de un usuario (INTERNO: lo usa el processor para el estado de cuenta)
+router.get('/accounts/:userId/ledger', requireInternal, ctrl.getLedger);
+
 module.exports = router;

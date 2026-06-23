@@ -95,22 +95,25 @@ function Statements() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginBottom: 6 }}>Movimientos liquidados</h2>
+        <h2 style={{ marginBottom: 6 }}>Detalle de movimientos</h2>
         {data.movements.length === 0 ? (
-          <div className="empty">Aún no tienes movimientos liquidados.</div>
+          <div className="empty">Aún no tienes movimientos registrados.</div>
         ) : (
           <div className="list">
-            {data.movements.map((m) => {
-              const sent = m.type === 'sent';
+            {data.movements.slice().reverse().map((m, idx) => {
+              const cargo = m.kind === 'cargo';
               return (
-                <div key={m.id} className="list-row">
+                <div key={`${m.folio}-${idx}`} className="list-row">
                   <div className="grow">
-                    <b>{sent ? 'Enviado a' : 'Recibido de'} Usuario #{m.counterparty_id}</b>
-                    <div className="sub">#{m.id} · {dateTime(m.created_at)}</div>
+                    <b>{m.concepto}</b>
+                    <div className="sub">{m.folio} · {dateTime(m.created_at)}</div>
                   </div>
-                  <span className={sent ? 'amount-neg' : 'amount-pos'} style={{ minWidth: 100, textAlign: 'right' }}>
-                    {sent ? '−' : '+'}{money(m.amount)}
-                  </span>
+                  <div style={{ textAlign: 'right', minWidth: 120 }}>
+                    <span className={cargo ? 'amount-neg' : 'amount-pos'} style={{ display: 'block' }}>
+                      {cargo ? '−' : '+'}{money(m.amount)}
+                    </span>
+                    <span className="muted" style={{ fontSize: 11 }}>Saldo {money(m.balance)}</span>
+                  </div>
                 </div>
               );
             })}
