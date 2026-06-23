@@ -1,0 +1,302 @@
+{
+  "info": {
+    "name": "NeoWallet · Suite de API",
+    "description": "Pruebas de API de NeoWallet (Escenario 2): auth, saldos, transferencias, idempotencia, endpoint interno e historial. Ejecutable con Newman. Requiere el stack levantado (docker compose up).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Claves de idempotencia únicas por ejecución, compartidas entre los pares de requests.",
+          "if (!pm.collectionVariables.get('trfKey')) pm.collectionVariables.set('trfKey', 'pm-trf-' + Date.now());",
+          "if (!pm.collectionVariables.get('rchKey')) pm.collectionVariables.set('rchKey', 'pm-rch-' + Date.now());"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "accounts", "value": "http://localhost:3000" },
+    { "key": "processor", "value": "http://localhost:3001" },
+    { "key": "tokenA", "value": "" },
+    { "key": "tokenB", "value": "" },
+    { "key": "idA", "value": "" },
+    { "key": "idB", "value": "" },
+    { "key": "rchBal1", "value": "" },
+    { "key": "txId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "CP-28 Health accounts (200)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('status ok', () => pm.response.json().status === 'ok');"
+      ] } }],
+      "request": { "method": "GET", "header": [], "url": { "raw": "{{accounts}}/health", "host": ["{{accounts}}"], "path": ["health"] } }
+    },
+    {
+      "name": "CP-28 Health processor (200)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);"
+      ] } }],
+      "request": { "method": "GET", "header": [], "url": { "raw": "{{processor}}/health", "host": ["{{processor}}"], "path": ["health"] } }
+    },
+    {
+      "name": "CP-01 Login A (200, guarda token+id)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "const d = pm.response.json();",
+        "pm.test('token JWT', () => typeof d.token === 'string' && d.token.split('.').length === 3);",
+        "pm.collectionVariables.set('tokenA', d.token);",
+        "pm.collectionVariables.set('idA', d.user.id);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"usuario.a@neowallet.com\",\"password\":\"neowallet123\"}" },
+        "url": { "raw": "{{accounts}}/auth/login", "host": ["{{accounts}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "CP-01 Login B (200, guarda token+id)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "const d = pm.response.json();",
+        "pm.collectionVariables.set('tokenB', d.token);",
+        "pm.collectionVariables.set('idB', d.user.id);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"usuario.b@neowallet.com\",\"password\":\"neowallet123\"}" },
+        "url": { "raw": "{{accounts}}/auth/login", "host": ["{{accounts}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "CP-02 Login contraseña incorrecta (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('401', () => pm.response.code === 401);",
+        "pm.test('invalid_credentials', () => pm.response.json().error === 'invalid_credentials');"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"usuario.a@neowallet.com\",\"password\":\"incorrecta\"}" },
+        "url": { "raw": "{{accounts}}/auth/login", "host": ["{{accounts}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "CP-03 Directorio sin token (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ] } }],
+      "request": { "method": "GET", "header": [], "url": { "raw": "{{accounts}}/accounts", "host": ["{{accounts}}"], "path": ["accounts"] } }
+    },
+    {
+      "name": "CP-05 /auth/me con token (200)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('soy yo', () => pm.response.json().id == pm.collectionVariables.get('idA'));"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{accounts}}/auth/me", "host": ["{{accounts}}"], "path": ["auth", "me"] } }
+    },
+    {
+      "name": "CP-04 Token inválido (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer basura" }], "url": { "raw": "{{accounts}}/auth/me", "host": ["{{accounts}}"], "path": ["auth", "me"] } }
+    },
+    {
+      "name": "CP-06 Saldo propio (200)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('tiene balance', () => typeof pm.response.json().balance === 'number');"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{accounts}}/accounts/{{idA}}", "host": ["{{accounts}}"], "path": ["accounts", "{{idA}}"] } }
+    },
+    {
+      "name": "CP-07 Saldo ajeno (403)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('403', () => pm.response.code === 403);"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{accounts}}/accounts/{{idB}}", "host": ["{{accounts}}"], "path": ["accounts", "{{idB}}"] } }
+    },
+    {
+      "name": "CP-08 Recarga válida (200, guarda saldo)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "const d = pm.response.json();",
+        "pm.test('new_balance numérico', () => typeof d.new_balance === 'number');",
+        "pm.collectionVariables.set('rchBal1', d.new_balance);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"amount\":100,\"payment_method\":\"card\",\"idempotency_key\":\"{{rchKey}}\"}" },
+        "url": { "raw": "{{accounts}}/api/recharge", "host": ["{{accounts}}"], "path": ["api", "recharge"] }
+      }
+    },
+    {
+      "name": "CP-10 Recarga idempotente (200, saldo igual)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('no recarga 2 veces', () => pm.response.json().new_balance === Number(pm.collectionVariables.get('rchBal1')));"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"amount\":100,\"payment_method\":\"card\",\"idempotency_key\":\"{{rchKey}}\"}" },
+        "url": { "raw": "{{accounts}}/api/recharge", "host": ["{{accounts}}"], "path": ["api", "recharge"] }
+      }
+    },
+    {
+      "name": "CP-09 Recarga monto inválido (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400', () => pm.response.code === 400);",
+        "pm.test('invalid_amount', () => pm.response.json().error === 'invalid_amount');"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"amount\":-5}" },
+        "url": { "raw": "{{accounts}}/api/recharge", "host": ["{{accounts}}"], "path": ["api", "recharge"] }
+      }
+    },
+    {
+      "name": "CP-11 Transferencia válida (201 COMPLETED)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('201', () => pm.response.code === 201);",
+        "const d = pm.response.json();",
+        "pm.test('COMPLETED', () => d.status === 'COMPLETED');",
+        "pm.collectionVariables.set('txId', d.transaction_id);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"receiver_id\":{{idB}},\"amount\":10,\"idempotency_key\":\"{{trfKey}}\"}" },
+        "url": { "raw": "{{processor}}/api/transfer", "host": ["{{processor}}"], "path": ["api", "transfer"] }
+      }
+    },
+    {
+      "name": "CP-18 Transferencia idempotente (replay)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('201', () => pm.response.code === 201);",
+        "const d = pm.response.json();",
+        "pm.test('idempotent_replay', () => d.idempotent_replay === true);",
+        "pm.test('misma transacción', () => d.transaction_id == pm.collectionVariables.get('txId'));"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"receiver_id\":{{idB}},\"amount\":10,\"idempotency_key\":\"{{trfKey}}\"}" },
+        "url": { "raw": "{{processor}}/api/transfer", "host": ["{{processor}}"], "path": ["api", "transfer"] }
+      }
+    },
+    {
+      "name": "CP-12 Auto-transferencia (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400', () => pm.response.code === 400);",
+        "pm.test('self_transfer_not_allowed', () => pm.response.json().error === 'self_transfer_not_allowed');"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"receiver_id\":{{idA}},\"amount\":10}" },
+        "url": { "raw": "{{processor}}/api/transfer", "host": ["{{processor}}"], "path": ["api", "transfer"] }
+      }
+    },
+    {
+      "name": "CP-13 Transferencia monto inválido (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400', () => pm.response.code === 400);",
+        "pm.test('invalid_amount', () => pm.response.json().error === 'invalid_amount');"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"receiver_id\":{{idB}},\"amount\":0}" },
+        "url": { "raw": "{{processor}}/api/transfer", "host": ["{{processor}}"], "path": ["api", "transfer"] }
+      }
+    },
+    {
+      "name": "CP-16 Transferencia sin token (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"receiver_id\":{{idB}},\"amount\":1}" },
+        "url": { "raw": "{{processor}}/api/transfer", "host": ["{{processor}}"], "path": ["api", "transfer"] }
+      }
+    },
+    {
+      "name": "CP-14 Fondos insuficientes (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400', () => pm.response.code === 400);",
+        "pm.test('insufficient_funds', () => pm.response.json().error === 'insufficient_funds');"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"receiver_id\":{{idB}},\"amount\":9999999}" },
+        "url": { "raw": "{{processor}}/api/transfer", "host": ["{{processor}}"], "path": ["api", "transfer"] }
+      }
+    },
+    {
+      "name": "CP-15 Receptor inexistente (404)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('404', () => pm.response.code === 404);",
+        "pm.test('user_not_found', () => pm.response.json().error === 'user_not_found');"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"receiver_id\":99999,\"amount\":1}" },
+        "url": { "raw": "{{processor}}/api/transfer", "host": ["{{processor}}"], "path": ["api", "transfer"] }
+      }
+    },
+    {
+      "name": "CP-21 update-balance sin clave interna (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"user_id\":{{idA}},\"amount\":5,\"operation\":\"credit\"}" },
+        "url": { "raw": "{{accounts}}/accounts/update-balance", "host": ["{{accounts}}"], "path": ["accounts", "update-balance"] }
+      }
+    },
+    {
+      "name": "CP-22 update-balance con token de usuario (401)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"user_id\":{{idA}},\"amount\":5,\"operation\":\"credit\"}" },
+        "url": { "raw": "{{accounts}}/accounts/update-balance", "host": ["{{accounts}}"], "path": ["accounts", "update-balance"] }
+      }
+    },
+    {
+      "name": "CP-24 Historial propio (200)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('es lista', () => Array.isArray(pm.response.json()));"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{processor}}/api/transactions/{{idA}}", "host": ["{{processor}}"], "path": ["api", "transactions", "{{idA}}"] } }
+    },
+    {
+      "name": "CP-25 Historial ajeno (403)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('403', () => pm.response.code === 403);"
+      ] } }],
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }], "url": { "raw": "{{processor}}/api/transactions/{{idB}}", "host": ["{{processor}}"], "path": ["api", "transactions", "{{idB}}"] } }
+    }
+  ]
+}

@@ -118,7 +118,24 @@ Contrato detallado en [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md).
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Decisiones de arquitectura, seguridad, resiliencia, diagramas |
 | [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md) | Endpoints, reglas de negocio, ejemplos curl, eventos WebSocket |
 | [`shared-infra/SCHEMA.md`](./shared-infra/SCHEMA.md) | Modelo de datos (tablas, relaciones, índices) |
+| [`docs/CI.md`](./docs/CI.md) | Pipeline de integración continua (Jenkins) |
 | READMEs por servicio | [accounts](./accounts-service/README.md) · [processor](./processor-service/README.md) · [frontend](./frontend/README.md) |
+
+## 🧪 Pruebas
+
+| Artefacto | Tipo | Qué cubre |
+|-----------|------|-----------|
+| [`tests/TEST_CASES.md`](./tests/TEST_CASES.md) | Casos manuales (CP-01..29) | Trazables a RF/RN/RNF/CU |
+| [`tests/features/`](./tests/features/) | BDD/Gherkin (español) | Autenticación, transferencias, idempotencia |
+| [`tests/postman/NeoWallet.postman_collection.json`](./tests/postman/NeoWallet.postman_collection.json) | Suite API (Newman) | 24 requests · 40 assertions — corre en CI |
+| [`Jenkinsfile`](./Jenkinsfile) | CI | build → up → healthcheck → Newman → cleanup |
+
+Ejecutar la suite localmente (con el stack levantado):
+
+```bash
+docker run --rm --network host -v "$PWD/tests/postman:/etc/newman" \
+  postman/newman:alpine run /etc/newman/NeoWallet.postman_collection.json
+```
 
 ## ▶️ Flujo de prueba rápido
 
