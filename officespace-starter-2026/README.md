@@ -4,6 +4,14 @@ Arquitectura de **microservicios** dockerizados. Cada servicio corre en su propi
 contenedor, con su propio puerto, proceso y `Dockerfile`, y se comunica con los
 demás vía **HTTP**. Todos comparten una única instancia de **MongoDB**.
 
+## 👤 Autor
+
+- **Estrada Olalde Daniel Alejandro**
+- Ingeniería en Informática — **UPIICSA** (Instituto Politécnico Nacional)
+- GitHub: [@alnuxE](https://github.com/alnuxE)
+
+> Proyecto desarrollado por **Daniel Alejandro Estrada Olalde** para el **IBM Hackathon 2026** (Escenario 1 — OfficeSpace).
+
 ## Arquitectura
 
 ```
