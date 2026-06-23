@@ -57,6 +57,35 @@ La base de datos se inicializa automáticamente con datos de ejemplo
 
 ---
 
+## 🔁 Modo desarrollo (hot reload, sin reconstruir)
+
+En el modo normal, cada cambio de código requiere reconstruir la imagen
+(`--build`). Para que **los cambios se vean al instante al guardar un archivo**,
+usa el modo desarrollo: monta tu código como volumen y corre los servidores en
+modo *watch* (backends con `node --watch`, frontend con `next dev`).
+
+```bash
+# Dentro de officespace-starter-2026/
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+Para no escribir los `-f` cada vez, defínelo una vez por terminal:
+
+```bash
+export COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+docker compose up        # ya usa ambos archivos → hot reload
+```
+
+Ahora guardas un archivo y el servicio se recarga solo (≈1 s), sin `--build`.
+
+> ⚠️ Notas:
+> - Instalar **nuevas dependencias** (cambios en `package.json`) sí requiere
+>   reconstruir: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`.
+> - Si los cambios del frontend no se detectan en tu sistema de archivos,
+>   descomenta `WATCHPACK_POLLING: "true"` en `docker-compose.dev.yml`.
+
+---
+
 ## 🌐 Servicios y puertos
 
 | Servicio          | URL local                     | Puerto | Rol                              |

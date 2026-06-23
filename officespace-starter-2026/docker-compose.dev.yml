@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Modo DESARROLLO — hot reload SIN reconstruir el contenedor.
+#
+# Monta tu código como volumen y corre los servidores en modo "watch":
+#   • Backends (auth/catalog/booking): npm run dev  →  node --watch server.js
+#   • Frontend:                        npm run dev  →  next dev
+#
+# Así, al guardar un archivo, los cambios se reflejan al instante (sin --build).
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Atajo (para no escribir los -f cada vez), defínelo una vez en tu terminal:
+#   export COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+#   docker compose up           # ya usa ambos archivos
+#
+# El volumen anónimo `/app/node_modules` evita que tu carpeta local pise las
+# dependencias ya instaladas dentro de la imagen.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  auth-service:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./auth-service:/app
+      - /app/node_modules
+
+  catalog-service:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./catalog-service:/app
+      - /app/node_modules
+
+  booking-service:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./booking-service:/app
+      - /app/node_modules
+
+  frontend:
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      # En `next dev` estas variables se leen en runtime (no hace falta rebuild).
+      NEXT_PUBLIC_AUTH_URL: http://localhost:4000
+      NEXT_PUBLIC_CATALOG_URL: http://localhost:4001
+      NEXT_PUBLIC_BOOKING_URL: http://localhost:4002
+      # Descomenta si tus cambios no se detectan (FS sin eventos inotify):
+      # WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
