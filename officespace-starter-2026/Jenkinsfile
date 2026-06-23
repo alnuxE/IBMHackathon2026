@@ -1,0 +1,101 @@
+// Pipeline CI de OfficeSpace.
+// Requisitos del agente Jenkins: Docker + Docker Compose v2.
+// Configura el Job con "Script Path: officespace-starter-2026/Jenkinsfile".
+
+pipeline {
+  agent any
+
+  options {
+    timeout(time: 30, unit: 'MINUTES')
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    // Secreto JWT para el entorno efímero de CI
+    JWT_SECRET = 'ci_secret_officespace'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Validar sintaxis (backend)') {
+      steps {
+        dir('officespace-starter-2026') {
+          // Usa una imagen de Node para no depender de que el agente tenga Node
+          sh '''
+            docker run --rm -v "$PWD":/app -w /app node:20-alpine sh -lc '
+              set -e
+              for s in auth-service catalog-service booking-service; do
+                for f in $(find "$s" -name "*.js" -not -path "*/node_modules/*"); do
+                  node --check "$f"
+                done
+              done
+              echo "Sintaxis OK"
+            '
+          '''
+        }
+      }
+    }
+
+    stage('Build') {
+      steps {
+        dir('officespace-starter-2026') {
+          sh 'docker compose build'
+        }
+      }
+    }
+
+    stage('Levantar stack') {
+      steps {
+        dir('officespace-starter-2026') {
+          sh 'docker compose up -d'
+        }
+      }
+    }
+
+    stage('Healthchecks') {
+      steps {
+        sh '''
+          set -e
+          for url in http://localhost:4000/health http://localhost:4001/health http://localhost:4002/health; do
+            ok=0
+            for i in $(seq 1 30); do
+              if curl -sf "$url" >/dev/null; then echo "OK  $url"; ok=1; break; fi
+              sleep 2
+            done
+            [ "$ok" = "1" ] || { echo "TIMEOUT $url"; exit 1; }
+          done
+        '''
+      }
+    }
+
+    stage('Pruebas de API (Newman)') {
+      steps {
+        dir('officespace-starter-2026') {
+          // --network host para que localhost:400x resuelva a los puertos publicados
+          sh '''
+            docker run --rm --network host \
+              -v "$PWD/tests/postman:/etc/newman" \
+              postman/newman:alpine run /etc/newman/OfficeSpace.postman_collection.json \
+              --reporters cli
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    failure {
+      dir('officespace-starter-2026') {
+        sh 'docker compose logs --tail=120 || true'
+      }
+    }
+    always {
+      dir('officespace-starter-2026') {
+        sh 'docker compose down -v || true'
+      }
+    }
+  }
+}

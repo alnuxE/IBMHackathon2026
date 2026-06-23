@@ -1,0 +1,216 @@
+{
+  "info": {
+    "name": "OfficeSpace API",
+    "description": "Colección de pruebas de la API de OfficeSpace (auth, catalog, booking). Ejecuta los requests en orden. Variables en la pestaña Variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "auth", "value": "http://localhost:4000" },
+    { "key": "catalog", "value": "http://localhost:4001" },
+    { "key": "booking", "value": "http://localhost:4002" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "esp1", "value": "" },
+    { "key": "esp2", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login Admin",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "const j = pm.response.json();",
+        "pm.collectionVariables.set('adminToken', j.token);",
+        "pm.test('rol ADMINISTRADOR', () => j.user.rol === 'ADMINISTRADOR');"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"admin@corporativoalpha.com\",\n  \"password\": \"Admin123\"\n}" },
+        "url": { "raw": "{{auth}}/auth/login", "host": ["{{auth}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "Login Colaborador",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.collectionVariables.set('token', pm.response.json().token);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"carlos.mendez@corporativoalpha.com\",\n  \"password\": \"User123\"\n}" },
+        "url": { "raw": "{{auth}}/auth/login", "host": ["{{auth}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "Login inválido (401)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"admin@corporativoalpha.com\",\n  \"password\": \"mala\"\n}" },
+        "url": { "raw": "{{auth}}/auth/login", "host": ["{{auth}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "Listar espacios (guarda ids)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "const arr = pm.response.json();",
+        "const e1 = arr.find(s => s.codigo === 'ESP-001');",
+        "const e2 = arr.find(s => s.codigo === 'ESP-002');",
+        "if (e1) pm.collectionVariables.set('esp1', e1._id);",
+        "if (e2) pm.collectionVariables.set('esp2', e2._id);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": { "raw": "{{catalog}}/spaces", "host": ["{{catalog}}"], "path": ["spaces"] }
+      }
+    },
+    {
+      "name": "Espacios sin token (401)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('401', () => pm.response.code === 401);"
+      ], "type": "text/javascript" } }],
+      "request": { "method": "GET", "header": [], "url": { "raw": "{{catalog}}/spaces", "host": ["{{catalog}}"], "path": ["spaces"] } }
+    },
+    {
+      "name": "Crear espacio como Colaborador (403)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('403', () => pm.response.code === 403);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"ESP-X\",\n  \"nombre\": \"No permitido\",\n  \"tipo\": \"sala_juntas\",\n  \"capacidad\": 4,\n  \"ubicacion\": { \"edificio\": \"X\", \"piso\": 1 }\n}" },
+        "url": { "raw": "{{catalog}}/spaces", "host": ["{{catalog}}"], "path": ["spaces"] }
+      }
+    },
+    {
+      "name": "Crear reserva válida (201)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('201', () => pm.response.code === 201);",
+        "pm.test('estado programada', () => pm.response.json().status === 'programada');"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"spaceId\": \"{{esp1}}\",\n  \"fechaInicio\": \"2027-09-01T10:00:00.000Z\",\n  \"fechaFin\": \"2027-09-01T11:00:00.000Z\",\n  \"asistentes\": 6\n}" },
+        "url": { "raw": "{{booking}}/reservas", "host": ["{{booking}}"], "path": ["reservas"] }
+      }
+    },
+    {
+      "name": "Reserva solapada (409)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('409', () => pm.response.code === 409);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"spaceId\": \"{{esp1}}\",\n  \"fechaInicio\": \"2027-09-01T10:30:00.000Z\",\n  \"fechaFin\": \"2027-09-01T11:30:00.000Z\",\n  \"asistentes\": 2\n}" },
+        "url": { "raw": "{{booking}}/reservas", "host": ["{{booking}}"], "path": ["reservas"] }
+      }
+    },
+    {
+      "name": "Capacidad excedida (400)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('400', () => pm.response.code === 400);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"spaceId\": \"{{esp2}}\",\n  \"fechaInicio\": \"2027-09-02T10:00:00.000Z\",\n  \"fechaFin\": \"2027-09-02T11:00:00.000Z\",\n  \"asistentes\": 5\n}" },
+        "url": { "raw": "{{booking}}/reservas", "host": ["{{booking}}"], "path": ["reservas"] }
+      }
+    },
+    {
+      "name": "Fin antes que inicio (400)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('400', () => pm.response.code === 400);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"spaceId\": \"{{esp1}}\",\n  \"fechaInicio\": \"2027-09-03T12:00:00.000Z\",\n  \"fechaFin\": \"2027-09-03T10:00:00.000Z\",\n  \"asistentes\": 2\n}" },
+        "url": { "raw": "{{booking}}/reservas", "host": ["{{booking}}"], "path": ["reservas"] }
+      }
+    },
+    {
+      "name": "Disponibilidad por rango (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('esp1 ocupado en 10:30-11:00', () => pm.response.json().includes(pm.collectionVariables.get('esp1')));"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{booking}}/reservas/ocupados?inicio=2027-09-01T10:30:00.000Z&fin=2027-09-01T11:00:00.000Z", "host": ["{{booking}}"], "path": ["reservas", "ocupados"], "query": [{ "key": "inicio", "value": "2027-09-01T10:30:00.000Z" }, { "key": "fin", "value": "2027-09-01T11:00:00.000Z" }] }
+      }
+    },
+    {
+      "name": "Mis reservas (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('es un array', () => Array.isArray(pm.response.json()));"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{booking}}/reservas/me", "host": ["{{booking}}"], "path": ["reservas", "me"] }
+      }
+    },
+    {
+      "name": "Todas las reservas - admin (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('200', () => pm.response.code === 200);",
+        "pm.test('es un array', () => Array.isArray(pm.response.json()));"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+        "url": { "raw": "{{booking}}/reservas", "host": ["{{booking}}"], "path": ["reservas"] }
+      }
+    },
+    {
+      "name": "Todas las reservas - colaborador (403)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('403', () => pm.response.code === 403);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": { "raw": "{{booking}}/reservas", "host": ["{{booking}}"], "path": ["reservas"] }
+      }
+    },
+    {
+      "name": "Importar reservas - admin (201)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('201', () => pm.response.code === 201);",
+        "const r = pm.response.json();",
+        "pm.test('al menos 1 importada', () => r.importadas >= 1);",
+        "pm.test('1 rechazada por capacidad', () => r.rechazadas.length >= 1);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"reservas\": [\n    { \"spaceCodigo\": \"ESP-001\", \"usuario\": \"import@corporativoalpha.com\", \"fechaInicio\": \"2027-10-01T10:00:00.000Z\", \"fechaFin\": \"2027-10-01T11:00:00.000Z\", \"asistentes\": 5 },\n    { \"spaceCodigo\": \"ESP-003\", \"usuario\": \"import@corporativoalpha.com\", \"fechaInicio\": \"2027-10-02T09:00:00.000Z\", \"fechaFin\": \"2027-10-02T12:00:00.000Z\", \"asistentes\": 15 },\n    { \"spaceCodigo\": \"ESP-002\", \"usuario\": \"import@corporativoalpha.com\", \"fechaInicio\": \"2027-10-03T09:00:00.000Z\", \"fechaFin\": \"2027-10-03T10:00:00.000Z\", \"asistentes\": 9 }\n  ]\n}" },
+        "url": { "raw": "{{booking}}/reservas/import", "host": ["{{booking}}"], "path": ["reservas", "import"] }
+      }
+    },
+    {
+      "name": "Importar reservas - colaborador (403)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('403', () => pm.response.code === 403);"
+      ], "type": "text/javascript" } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"reservas\": [] }" },
+        "url": { "raw": "{{booking}}/reservas/import", "host": ["{{booking}}"], "path": ["reservas", "import"] }
+      }
+    }
+  ]
+}

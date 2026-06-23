@@ -1,0 +1,20 @@
+# Dependencias
+node_modules/
+*/node_modules/
+
+# Variables de entorno reales (NO subir secretos)
+.env
+*/.env
+
+# Builds
+.next/
+*/.next/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store

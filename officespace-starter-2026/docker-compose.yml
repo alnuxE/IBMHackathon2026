@@ -1,0 +1,121 @@
+# Orquestación de todos los microservicios + base de datos.
+# Un solo compose levanta todo: `docker compose up --build`
+#
+# Cada servicio = su propio contenedor, proceso y puerto.
+# Todos comparten la MISMA instancia de MongoDB (red interna `officespace-net`).
+# El navegador (frontend) habla con los servicios por los puertos publicados en localhost.
+
+services:
+  # ----------------------------------------------------------------------------
+  # Base de datos compartida (MongoDB) — puerto default 27017
+  # ----------------------------------------------------------------------------
+  mongo:
+    image: mongo:7
+    container_name: officespace-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: officespace
+    volumes:
+      - mongo-data:/data/db
+      # Script de inicialización (crea colecciones e índices y datos de ejemplo)
+      - ./shared-infra/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - officespace-net
+
+  # ----------------------------------------------------------------------------
+  # Microservicio C: Autenticación (emite JWT)
+  # ----------------------------------------------------------------------------
+  auth-service:
+    build: ./auth-service
+    container_name: officespace-auth
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      MONGO_URI: mongodb://mongo:27017/officespace
+      JWT_SECRET: ${JWT_SECRET:-supersecret_change_me_in_prod}
+      JWT_EXPIRES_IN: 1d
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - officespace-net
+
+  # ----------------------------------------------------------------------------
+  # Microservicio A: Catálogo de espacios
+  # ----------------------------------------------------------------------------
+  catalog-service:
+    build: ./catalog-service
+    container_name: officespace-catalog
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      PORT: 4001
+      MONGO_URI: mongodb://mongo:27017/officespace
+      JWT_SECRET: ${JWT_SECRET:-supersecret_change_me_in_prod}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - officespace-net
+
+  # ----------------------------------------------------------------------------
+  # Microservicio B: Motor de reservas (llama a catalog-service vía HTTP)
+  # ----------------------------------------------------------------------------
+  booking-service:
+    build: ./booking-service
+    container_name: officespace-booking
+    restart: unless-stopped
+    ports:
+      - "4002:4002"
+    environment:
+      PORT: 4002
+      MONGO_URI: mongodb://mongo:27017/officespace
+      JWT_SECRET: ${JWT_SECRET:-supersecret_change_me_in_prod}
+      # Comunicación entre servicios por HTTP usando el nombre de red interno
+      CATALOG_SERVICE_URL: http://catalog-service:4001
+    depends_on:
+      mongo:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+    networks:
+      - officespace-net
+
+  # ----------------------------------------------------------------------------
+  # Frontend: Next.js (React)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Estas URLs las usa el NAVEGADOR, por eso apuntan a localhost (puertos publicados)
+        NEXT_PUBLIC_AUTH_URL: http://localhost:4000
+        NEXT_PUBLIC_CATALOG_URL: http://localhost:4001
+        NEXT_PUBLIC_BOOKING_URL: http://localhost:4002
+    container_name: officespace-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - catalog-service
+      - booking-service
+    networks:
+      - officespace-net
+
+volumes:
+  mongo-data:
+
+networks:
+  officespace-net:
+    driver: bridge
